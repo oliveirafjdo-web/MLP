@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avante-like Redutron • Métricas Mercado Livre</title>
+<style>
+:root{
+  --bg:#0a0f1f;
+  --bg2:#0b1940;
+  --ink:#eaf6ff;
+  --muted:#9fb4d1;
+  --cyan:#2df2ff;
+  --mint:#00ffa6;
+  --line:#163366;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:linear-gradient(180deg,var(--bg2),var(--bg));color:var(--ink)}
+.container{max-width:1100px;margin:0 auto;padding:24px}
+nav{position:sticky;top:0;background:rgba(10,15,31,.8);backdrop-filter:saturate(130%) blur(6px);border-bottom:1px solid var(--line);z-index:10}
+nav .container{display:flex;align-items:center;justify-content:space-between;padding:12px 24px}
+.brand{display:flex;gap:10px;align-items:center}
+.dot{width:12px;height:12px;border-radius:999px;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+a{color:var(--cyan);text-decoration:none}
+.btn{display:inline-block;padding:10px 14px;border-radius:12px;background:var(--mint);color:#03121a;font-weight:700}
+.hero{padding:64px 24px;border-bottom:1px solid var(--line)}
+h1{font-size:42px;margin:0 0 10px}
+p.lead{font-size:18px;color:var(--muted);max-width:820px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:22px}
+.card{background:rgba(24,35,76,.5);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h3{margin:0 0 8px}
+pre{background:#0b1a36;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;color:#d7e8ff}
+.small{color:var(--muted);font-size:13px}
+footer{padding:36px 24px;border-top:1px solid var(--line);color:var(--muted)}
+.imgph{height:220px;border:1px dashed var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.kbd{padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:#0b1a36}
+</style>
+</head>
+<body>
+<nav>
+  <div class="container">
+    <div class="brand"><span class="dot"></span><strong>Avante-like Redutron</strong></div>
+    <div><a href="https://github.com/oliveirafjdo-web/meli-avante-like" target="_blank" rel="noopener">Ver no GitHub →</a></div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Métricas instantâneas para anúncios do Mercado Livre</h1>
+    <p class="lead">Extensão Chrome (MV3) com backend Node/Express. Mostra preço, estoque, vendidos, visitas, conversão, faturamento estimado, <strong>link clicável para a loja</strong> e <strong>ranking na categoria</strong>.</p>
+    <p>
+      <a class="btn" href="https://github.com/oliveirafjdo-web/meli-avante-like" target="_blank" rel="noopener">Baixar código no GitHub</a>
+    </p>
+  </div>
+</header>
+
+<main class="container">
+  <section>
+    <div class="grid">
+      <div class="card">
+        <h3>Recursos</h3>
+        <ul>
+          <li>📊 Métricas: preço, estoque, vendidos, visitas (30d), conversão, faturamento</li>
+          <li>🏬 Link direto da loja do vendedor</li>
+          <li>📈 Ranking estimado na categoria (posição/total)</li>
+          <li>🔄 Atualiza ao trocar de anúncio + auto-refresh 30s</li>
+          <li>🔐 OAuth seguro (login no mesmo perfil do Chrome)</li>
+          <li>🎨 Paleta Redutron (azul marinho + neon ciano/verde)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Screenshot (placeholder)</h3>
+        <div class="imgph">Adicione aqui sua imagem do card em uso</div>
+        <p class="small">Coloque prints em <span class="kbd">docs/</span> e referencie aqui.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Como instalar</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>1) Backend (Node)</h3>
+        <pre>cd server
+cp .env.example .env
+# edite .env com CLIENT_ID/SECRET/REDIRECT_URI
+npm install
+npm start</pre>
+        <p class="small">Publique em HTTPS (Render/Railway/VPS). O backend armazena tokens com segurança.</p>
+      </div>
+      <div class="card">
+        <h3>2) Extensão (Chrome)</h3>
+        <ol>
+          <li>Abra <span class="kbd">chrome://extensions</span></li>
+          <li>Ative “Modo do desenvolvedor”</li>
+          <li>“Carregar sem compactação” → selecione <span class="kbd">extension/</span></li>
+          <li>Abra as <strong>Opções</strong> e informe a URL do backend</li>
+          <li>Visite um anúncio (MLB…) e veja o card 🎉</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>GitHub Pages</h2>
+    <ol>
+      <li>Vá em <em>Settings → Pages</em></li>
+      <li>Source: <strong>main</strong> • Folder: <strong>/docs</strong></li>
+      <li>Save → a página ficará disponível em <code>https://seuusuario.github.io/meli-avante-like</code></li>
+    </ol>
+    <p class="small">Esta página está pronta para ser servida pelo GitHub Pages a partir da pasta <span class="kbd">docs/</span>.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    © 2025 Redutron • Licença MIT • Feito com carinho e neon 💙
+  </div>
+</footer>
+</body>
+</html>
