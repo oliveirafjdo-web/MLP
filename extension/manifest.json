@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Avante-like para Mercado Livre (Redutron)",
+  "version": "0.2.0",
+  "description": "Card de métricas, link da loja e ranking na categoria para anúncios do Mercado Livre.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.mercadolivre.com.br/*",
+    "https://produto.mercadolivre.com.br/*",
+    "https://*.mercadolivre.com.br/*",
+    "https://*/api/*"
+  ],
+  "background": {
+    "service_worker": "bg.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.mercadolivre.com.br/*",
+        "https://produto.mercadolivre.com.br/*",
+        "https://*.mercadolivre.com.br/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

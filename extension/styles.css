@@ -1,0 +1,18 @@
+.meli-avante-card{position:fixed;right:16px;bottom:16px;z-index:999999;width:340px;
+  font-family:system-ui,sans-serif;background:#0a0f1f;color:#fff;border:1px solid #163366;border-radius:14px;
+  box-shadow:0 12px 40px rgba(0,0,0,.35);overflow:hidden}
+.meli-avante-card header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
+  background:linear-gradient(135deg,#0b1940,#0a0f1f 60%);border-bottom:1px solid #163366;font-weight:600}
+.meli-avante-card .brand{display:flex;gap:8px;align-items:center}
+.meli-avante-card .dot{width:8px;height:8px;border-radius:999px;background:#2df2ff;box-shadow:0 0 10px #2df2ff}
+.meli-avante-card .body{padding:12px;font-size:13px}
+.meli-avante-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.meli-pill{background:rgba(24,35,76,.7);border:1px solid #22407a;padding:10px;border-radius:10px}
+.meli-muted{opacity:.8;font-size:12px}
+.meli-link{color:#59e6ff;text-decoration:underline;cursor:pointer}
+.meli-cta{display:inline-block;margin-top:6px;padding:6px 10px;border-radius:10px;background:#00ffa6;color:#03121a;font-weight:700}
+#avante-refresh{cursor:pointer}
+.rank-ok{color:#00ffa6}
+.rank-miss{color:#ffd166}
+.login{text-align:center;padding:16px}
+a{color:#59e6ff}
