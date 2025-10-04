@@ -1,10 +1,8 @@
-  import axios from 'axios';
+import axios from 'axios';
 
-// Domínios oficiais
-const OAUTH_BASE = 'https://auth.mercadolibre.com';   // ✅ corrigido (sem .br)
+const OAUTH_BASE = 'https://auth.mercadolibre.com';
 const API_BASE   = 'https://api.mercadolibre.com';
 
-// Monta a URL de autenticação (login)
 export function authUrl({ clientId, redirectUri, state }) {
   const p = new URL(OAUTH_BASE + '/authorization');
   p.searchParams.set('response_type', 'code');
@@ -14,9 +12,6 @@ export function authUrl({ clientId, redirectUri, state }) {
   return p.toString();
 }
 
-// ────────────────────────────────
-// Troca CODE por ACCESS TOKEN (x-www-form-urlencoded)
-// ────────────────────────────────
 export async function exchangeCode({ clientId, clientSecret, redirectUri, code }) {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -33,9 +28,6 @@ export async function exchangeCode({ clientId, clientSecret, redirectUri, code }
   return data;
 }
 
-// ────────────────────────────────
-// Refresh de token (x-www-form-urlencoded)
-// ────────────────────────────────
 export async function refreshToken({ clientId, clientSecret, refreshToken }) {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -51,7 +43,6 @@ export async function refreshToken({ clientId, clientSecret, refreshToken }) {
   return data;
 }
 
-// GET genérico autenticado
 export async function apiGet(path, accessToken, params = {}) {
   const { data } = await axios.get(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -60,14 +51,13 @@ export async function apiGet(path, accessToken, params = {}) {
   return data;
 }
 
-// Resumo do item: preço/estoque/vendidos/visitas/pedidos/ranking
 export async function itemSummary(accessToken, itemId) {
   const item = await apiGet(`/items/${itemId}`, accessToken);
+
   const price     = item.price ?? item.base_price ?? null;
   const available = item.available_quantity ?? null;
   const sold      = item.sold_quantity ?? null;
 
-  // Dados do vendedor
   let seller_permalink = null, seller_nickname = null;
   try {
     const user = await apiGet(`/users/${item.seller_id}`, accessToken);
@@ -75,7 +65,6 @@ export async function itemSummary(accessToken, itemId) {
     seller_nickname  = user.nickname  || null;
   } catch {}
 
-  // Visitas 30d
   let visits30 = null;
   try {
     const v = await apiGet(`/visits/items`, accessToken, {
@@ -85,7 +74,6 @@ export async function itemSummary(accessToken, itemId) {
     visits30 = (v?.results?.[itemId]?.total) ?? null;
   } catch {}
 
-  // Pedidos pagos 30d
   let orders30 = null;
   try {
     const dateFrom = new Date(Date.now() - 30 * 864e5).toISOString();
@@ -100,13 +88,14 @@ export async function itemSummary(accessToken, itemId) {
     orders30 = orders?.paging?.total ?? orders?.results?.length ?? null;
   } catch {}
 
-  // Ranking na categoria (estimativa via busca padrão)
   let rank = null, total = null;
   try {
-    const cat = item.category_id;
+    const site = item.site_id || (item.id?.slice(0,3)) || 'MLB';
+    const cat  = item.category_id;
     let offset = 0, limit = 50, pos = null, count = null;
+
     while (offset < 1000 && pos === null) {
-      const search = await apiGet(`/sites/MLB/search`, accessToken, { category: cat, limit, offset });
+      const search = await apiGet(`/sites/${site}/search`, accessToken, { category: cat, limit, offset });
       if (count === null) count = search.paging?.total ?? null;
       const ids = (search.results || []).map(r => r.id);
       const idx = ids.indexOf(itemId);
