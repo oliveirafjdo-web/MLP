@@ -66,6 +66,12 @@ app.get('/api/item/:id/summary', ensureAuth, async (req,res)=>{
     res.json(data);
   }catch(e){ res.status(500).json({error:String(e)}); }
 });
+app.get('/', (req, res) => {
+  res.send('✅ Redutron backend ativo!');
+});
 
+app.get('/health', (req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
 const port=process.env.PORT||8080;
 app.listen(port, ()=> console.log('Backend on', port));
