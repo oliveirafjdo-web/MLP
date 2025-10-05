@@ -1,57 +1,139 @@
-import 'dotenv/config';
-import express from 'express';
-import session from 'express-session';
-import cookieParser from 'cookie-parser';
-import cors from 'cors';
-import { v4 as uuid } from 'uuid';
-import { authUrl, exchangeCode, refreshToken, itemSummary } from './meli.js';
+import express from "express";
+import session from "express-session";
+import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
-app.use(cookieParser());
+const PORT = process.env.PORT || 8080;
+
 app.use(express.json());
-app.use(cors({ origin: true, credentials: true }));
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'troque-isto',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax' }
-}));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "redutron_secret",
+    resave: false,
+    saveUninitialized: true,
+  })
+);
 
-const CFG = {
-  clientId: process.env.ML_CLIENT_ID,
-  clientSecret: process.env.ML_CLIENT_SECRET,
-  redirectUri: process.env.ML_REDIRECT_URI,
-  baseUrl: process.env.BASE_URL
-};
+// ===============================
+// CONFIG MERCADO LIVRE
+// ===============================
+const ML_CLIENT_ID = process.env.ML_CLIENT_ID;
+const ML_CLIENT_SECRET = process.env.ML_CLIENT_SECRET;
+const ML_REDIRECT_URI = process.env.ML_REDIRECT_URI;
 
-const store = new Map();
-function ensureAuth(req,res,next){ const t=store.get(req.session.id); if(!t) return res.status(401).json({error:'not_logged_in'}); next(); }
-async function getValidToken(req){ let t=store.get(req.session.id); if(!t) return null;
-  if(Date.now()>t.expires_at-60_000){ const r=await refreshToken({clientId:CFG.clientId, clientSecret:CFG.clientSecret, refreshToken:t.refresh_token});
-    t={access_token:r.access_token, refresh_token:r.refresh_token??t.refresh_token, expires_at:Date.now()+r.expires_in*1000}; store.set(req.session.id,t); }
-  return t.access_token; }
+// ===============================
+// TESTES E STATUS
+// ===============================
+app.get("/", (req, res) => res.send("✅ Redutron backend ativo!"));
+app.get("/health", (req, res) => res.json({ ok: true }));
 
-app.get('/',(req,res)=>res.send('✅ Redutron backend ativo!'));
-app.get('/health',(req,res)=>res.json({ok:true,time:new Date().toISOString()}));
-
-app.get('/debug-config',(req,res)=>res.json({ base_url:process.env.BASE_URL||null, ml_client_id:CFG.clientId||null, ml_redirect_uri:CFG.redirectUri||null }));
-app.get('/oauth/test',(req,res)=>{ const state='test-'+uuid(); res.json({ auth_url:authUrl({clientId:CFG.clientId, redirectUri:CFG.redirectUri, state}) }); });
-
-app.get('/login',(req,res)=>{ const state=uuid(); req.session.state=state; if(req.query.redirect) req.session.post_login_redirect=req.query.redirect;
-  res.redirect(authUrl({ clientId:CFG.clientId, redirectUri:CFG.redirectUri, state })); });
-
-app.get('/oauth/callback', async (req,res)=>{
-  const {code,state}=req.query; if(!code || state!==req.session.state) return res.status(400).send('Estado inválido.');
-  try{ const tok=await exchangeCode({clientId:CFG.clientId, clientSecret:CFG.clientSecret, redirectUri:CFG.redirectUri, code});
-    store.set(req.session.id,{access_token:tok.access_token, refresh_token:tok.refresh_token, expires_at:Date.now()+tok.expires_in*1000});
-    res.send('<h3>Login concluído ✔</h3><p>Você pode fechar esta aba e voltar ao anúncio.</p>');
-  }catch(e){ res.status(500).send('Falha ao trocar o code por token: '+e); }
+// ===============================
+// LOGIN MERCADO LIVRE
+// ===============================
+app.get("/login", (req, res) => {
+  const url = `https://auth.mercadolibre.com.br/authorization?response_type=code&client_id=${ML_CLIENT_ID}&redirect_uri=${ML_REDIRECT_URI}`;
+  res.redirect(url);
 });
 
-app.get('/api/item/:id/summary', ensureAuth, async (req,res)=>{
-  try{ const token=await getValidToken(req); const data=await itemSummary(token, req.params.id); res.json(data); }
-  catch(e){ res.status(500).json({error:String(e)}); }
+// ===============================
+// CALLBACK DE LOGIN
+// ===============================
+app.get("/oauth/callback", async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.status(400).send("Código ausente");
+
+  try {
+    const response = await axios.post(
+      "https://api.mercadolibre.com/oauth/token",
+      new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: ML_CLIENT_ID,
+        client_secret: ML_CLIENT_SECRET,
+        code,
+        redirect_uri: ML_REDIRECT_URI,
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    req.session.token = response.data;
+    res.send("✅ Login realizado com sucesso! Pode fechar esta aba e voltar à extensão.");
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.status(400).json({ error: err.response?.data || err.message });
+  }
 });
 
-const port=process.env.PORT||8080;
-app.listen(port, ()=> console.log('Backend on', port));
+// ===============================
+// FUNÇÃO REFRESH TOKEN
+// ===============================
+async function refreshAccessToken(refresh_token) {
+  const response = await axios.post(
+    "https://api.mercadolibre.com/oauth/token",
+    new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: ML_CLIENT_ID,
+      client_secret: ML_CLIENT_SECRET,
+      refresh_token,
+    }),
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  return response.data;
+}
+
+// ===============================
+// API: /api/me
+// ===============================
+app.get("/api/me", async (req, res) => {
+  try {
+    let token = req.session.token;
+    if (!token) return res.status(401).send("Usuário não autenticado");
+
+    const response = await axios.get("https://api.mercadolibre.com/users/me", {
+      headers: { Authorization: `Bearer ${token.access_token}` },
+    });
+
+    res.json(response.data);
+  } catch (err) {
+    res.status(400).json({ error: err.response?.data || err.message });
+  }
+});
+
+// ===============================
+// API: /api/item/:id/summary
+// ===============================
+app.get("/api/item/:id/summary", async (req, res) => {
+  const itemId = req.params.id;
+  try {
+    let token = req.session.token;
+    if (!token) return res.status(401).send("Usuário não autenticado");
+
+    // Dados principais do item
+    const itemResp = await axios.get(`https://api.mercadolibre.com/items/${itemId}`);
+    const item = itemResp.data;
+
+    // Estatísticas de visitas
+    const visitsResp = await axios.get(
+      `https://api.mercadolibre.com/items/${itemId}/visits/time_window?last=30&unit=day`
+    );
+
+    res.json({
+      id: item.id,
+      title: item.title,
+      price: item.price,
+      available_quantity: item.available_quantity,
+      sold_quantity: item.sold_quantity,
+      permalink: item.permalink,
+      seller_id: item.seller_id,
+      visits_30d: visitsResp.data.total_visits || 0,
+      date_created: item.date_created,
+      last_updated: item.last_updated,
+    });
+  } catch (err) {
+    res.status(404).json({ error: err.response?.data || err.message });
+  }
+});
+
+app.listen(PORT, () => console.log(`🚀 Redutron backend rodando na porta ${PORT}`));
