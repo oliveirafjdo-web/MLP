@@ -1,90 +1,117 @@
-(function(){
-  let currentItem = null;
-  const getItemOnPage = () => {
-    const url = location.href;
-    const match = url.match(/(ML[ABCR]\d{8,})/i) || document.body.innerHTML.match(/(ML[ABCR]\d{8,})/i);
-    return match ? match[1].toUpperCase() : null;
-  };
+// Redutron Avante - Content Script Corrigido
 
-  function ensureCard(){
-    let card=document.querySelector('.meli-avante-card');
-    if(card) return card;
-    card=document.createElement('div'); card.className='meli-avante-card';
-    card.innerHTML=`
-      <header>
-        <div class="brand"><span class="dot"></span><span>Redutron Avante • <span id="avante-item"></span></span></div>
-        <span class="meli-muted" id="avante-refresh" title="Atualizar">↻</span>
-      </header>
-      <div class="body" id="avante-body"><div class="meli-muted">Carregando…</div></div>`;
-    document.documentElement.appendChild(card);
-    return card;
+console.log('[Redutron Avante] Content script ativo.');
+
+const getItemOnPage = () => {
+  const urlId = (location.href.match(/(ML[ABCR][A-Z0-9]*\d{6,})/i) || [])[1];
+  if (urlId) return urlId.toUpperCase();
+
+  const canon = document.querySelector('link[rel="canonical"]')?.href;
+  const canonId = canon && (canon.match(/(ML[ABCR][A-Z0-9]*\d{6,})/i) || [])[1];
+  if (canonId) return canonId.toUpperCase();
+
+  const og = document.querySelector('meta[property="og:url"]')?.content;
+  const ogId = og && (og.match(/(ML[ABCR][A-Z0-9]*\d{6,})/i) || [])[1];
+  if (ogId) return ogId.toUpperCase();
+
+  const ld = [...document.querySelectorAll('script[type="application/ld+json"]')];
+  for (const s of ld) {
+    try {
+      const d = JSON.parse(s.textContent || '{}');
+      const maybeId = d?.sku || d?.productID || d?.mpn || d?.gtin13 || d?.gtin;
+      if (typeof maybeId === 'string') {
+        const m = maybeId.match(/(ML[ABCR][A-Z0-9]*\d{6,})/i);
+        if (m) return m[1].toUpperCase();
+      }
+      const url = d?.url;
+      const mid = typeof url === 'string' && (url.match(/(ML[ABCR][A-Z0-9]*\d{6,})/i) || [])[1];
+      if (mid) return mid.toUpperCase();
+    } catch {}
   }
 
-  async function load(itemId){
-    const card = ensureCard();
-    card.querySelector('#avante-item').textContent = itemId || '-';
-    const body = card.querySelector('#avante-body');
-    body.innerHTML = `<div class="meli-muted">Carregando…</div>`;
-    chrome.runtime.sendMessage({type:'GET_ITEM_SUMMARY', itemId, pageUrl: location.href}, (resp)=>{
-      if(!resp) return;
-      if(resp.needsLogin){
-        body.innerHTML = `<div class="login"><p>Faça login para puxar dados da API do Mercado Livre.</p><p class="meli-muted">Uma aba foi aberta com o login seguro.</p></div>`;
+  try {
+    const m = String(window.utag_data?.item_id || '').match(/(ML[ABCR][A-Z0-9]*\d{6,})/i);
+    if (m) return m[1].toUpperCase();
+  } catch {}
+
+  const htmlId = (document.documentElement.innerHTML.match(/(ML[ABCR][A-Z0-9]*\d{6,})/i) || [])[1];
+  if (htmlId) return htmlId.toUpperCase();
+
+  return null;
+};
+
+function createFloatingCard() {
+  const id = getItemOnPage();
+  if (!id) return;
+
+  let card = document.getElementById('redutron-card');
+  if (card) card.remove();
+
+  card = document.createElement('div');
+  card.id = 'redutron-card';
+  card.style.cssText = `
+    position: fixed;
+    bottom: 15px;
+    right: 15px;
+    z-index: 999999;
+    width: 280px;
+    background: rgba(15, 23, 42, 0.9);
+    color: white;
+    border-radius: 10px;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    padding: 10px;
+    backdrop-filter: blur(6px);
+  `;
+
+  const title = document.createElement('div');
+  title.textContent = 'Redutron Avante • ' + id;
+  title.style = 'font-weight:bold; margin-bottom:8px; color:#38bdf8; font-size:13px;';
+
+  const body = document.createElement('div');
+  body.innerHTML = '<i>Carregando dados...</i>';
+  body.style.fontSize = '13px';
+
+  card.appendChild(title);
+  card.appendChild(body);
+  document.body.appendChild(card);
+
+  fetch(`https://mlp-o4qk.onrender.com/api/item/${id}/summary`)
+    .then(r => r.json())
+    .then(resp => {
+      if (resp?.error) {
+        body.innerHTML = `<div style="color:#fca5a5">
+          Erro ao buscar dados.<br><small>${resp.error || resp.detail || ''}</small>
+        </div>`;
         return;
       }
-      if(resp.error){ body.innerHTML = `<div style="color:#fca5a5">Erro: ${resp.error}</div>`; return; }
-      const d=resp.data; const fmt=(n)=> (typeof n==='number' ? n.toLocaleString('pt-BR',{maximumFractionDigits:2}) : '-');
-      const sellerLink = d.seller_permalink ? `<a href="${d.seller_permalink}" target="_blank" rel="noopener">Loja: ${d.seller_nickname||'vendedor'}</a>` : '';
-      let rankLine = '-';
-      if (d.rank_category && d.rank_category.total) {
-        const pos = d.rank_category.position, tot = d.rank_category.total;
-        rankLine = `<span class="${pos<=50?'rank-ok':'rank-miss'}">#${fmt(pos)}</span> de ${fmt(tot)} (busca padrão)`;
+      if (!resp || !resp.id) {
+        body.innerHTML = `<div style="color:#aaa">Sem dados para este anúncio.</div>`;
+        return;
       }
+      const data = resp;
       body.innerHTML = `
-        <div class="meli-avante-grid">
-          <div class="meli-pill"><div class="meli-muted">Preço</div><div>R$ ${fmt(d.price)}</div></div>
-          <div class="meli-pill"><div class="meli-muted">Estoque</div><div>${fmt(d.available_quantity)}</div></div>
-          <div class="meli-pill"><div class="meli-muted">Vendidos</div><div>${fmt(d.sold_quantity)}</div></div>
-          <div class="meli-pill"><div class="meli-muted">Visitas (30d)</div><div>${fmt(d.visits_30d)}</div></div>
-          <div class="meli-pill"><div class="meli-muted">Conversão (30d)</div><div>${d.conversion_30d!=null?(d.conversion_30d*100).toFixed(2)+'%':'-'}</div></div>
-          <div class="meli-pill"><div class="meli-muted">Faturamento est. (30d)</div><div>R$ ${fmt(d.revenue_30d)}</div></div>
+        <div>💰 <b>Preço:</b> R$ ${data.price ?? '-'}</div>
+        <div>📦 <b>Estoque:</b> ${data.available_quantity ?? '-'}</div>
+        <div>🛒 <b>Vendidos:</b> ${data.sold_quantity ?? '-'}</div>
+        <div>👁️ <b>Visitas (30d):</b> ${data.visits_30d ?? '-'}</div>
+        <div>📈 <b>Conversão:</b> ${data.conversion_30d ? (data.conversion_30d*100).toFixed(2)+'%' : '-'}</div>
+        <div>💵 <b>Faturamento (30d):</b> R$ ${data.revenue_30d?.toFixed?.(2) ?? '-'}</div>
+        <div style="margin-top:6px;font-size:11px;color:#aaa">
+          Criado: ${data.date_created?.slice(0,10) ?? '-'}<br>
+          Atualizado: ${data.last_updated?.slice(0,10) ?? '-'}<br>
+          Ranking: ${(data.rank_category?.position ?? '-')}/${(data.rank_category?.total ?? '-')}
         </div>
-        <div style="margin-top:10px" class="meli-muted">Criado: ${d.date_created ?? '-'} • Atualizado: ${d.last_updated ?? '-'}</div>
-        <div style="margin-top:6px">${sellerLink}</div>
-        <div style="margin-top:4px" class="meli-muted">Ranking na categoria: ${rankLine}</div>
+        <div style="margin-top:6px">
+          <a href="${data.seller_permalink}" target="_blank" style="color:#38bdf8;text-decoration:none">
+            👤 ${data.seller_nickname ?? 'Ver loja'}
+          </a>
+        </div>
       `;
+    })
+    .catch(err => {
+      body.innerHTML = `<span style="color:#f87171">Erro de rede: ${err.message}</span>`;
     });
-  }
+}
 
-  // Detecta navegação SPA do ML (muda a URL sem recarregar)
-  const observeUrlChange = () => {
-    let last = location.href;
-    new MutationObserver(()=>{
-      const now = location.href;
-      if(now!==last){
-        last = now;
-        setTimeout(()=>{
-          const id = getItemOnPage();
-          if(id && id!==currentItem){ currentItem=id; load(currentItem); }
-        }, 200);
-      }
-    }).observe(document, {subtree:true, childList:true});
-    window.addEventListener('popstate', ()=>{
-      const id=getItemOnPage(); if(id && id!==currentItem){ currentItem=id; load(currentItem); }
-    });
-  };
-
-  // Botão refresh
-  document.addEventListener('click',(e)=>{
-    if(e.target && e.target.id==='avante-refresh'){
-      if(currentItem) load(currentItem);
-    }
-  });
-
-  // Auto refresh periódico
-  setInterval(()=>{ if(currentItem) load(currentItem); }, 30000);
-
-  // Inicializa
-  const first = getItemOnPage();
-  if(first){ currentItem=first; load(first); }
-  observeUrlChange();
-})();
+setTimeout(createFloatingCard, 3000);
