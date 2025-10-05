@@ -1,0 +1,6 @@
+{
+  "CLIENT_ID": "2954774629979232",
+  "CLIENT_SECRET": "fdcVzY1gylLUHbfd52AlFCa7cDz2WDo",
+  "REDIRECT_URI": "https://mlp-o4qk.onrender.com/oauth/callback",
+  "SESSION_SECRET": "redutron-secret-please-change"
+}
