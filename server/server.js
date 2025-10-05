@@ -89,7 +89,7 @@ async function refreshAccessToken(refresh_token) {
 app.get("/api/me", async (req, res) => {
   try {
     let token = req.session.token;
-    if (!token) return res.status(401).send("Usuário não autenticado");
+   if (!token) return res.status(401).json({ error: "Usuário não autenticado" });
 
     const response = await axios.get("https://api.mercadolibre.com/users/me", {
       headers: { Authorization: `Bearer ${token.access_token}` },
