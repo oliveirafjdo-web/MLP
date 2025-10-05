@@ -1,15 +1,14 @@
 import axios from 'axios';
-
 const OAUTH_BASE = 'https://auth.mercadolibre.com';
 const API_BASE   = 'https://api.mercadolibre.com';
 
-export function authUrl({ clientId, redirectUri, state }) {
-  const p = new URL(OAUTH_BASE + '/authorization');
-  p.searchParams.set('response_type', 'code');
-  p.searchParams.set('client_id', clientId);
-  p.searchParams.set('redirect_uri', redirectUri);
-  p.searchParams.set('state', state);
-  return p.toString();
+export function buildAuthUrl({ clientId, redirectUri, state }) {
+  const u = new URL(OAUTH_BASE + '/authorization');
+  u.searchParams.set('response_type', 'code');
+  u.searchParams.set('client_id', clientId);
+  u.searchParams.set('redirect_uri', redirectUri);
+  u.searchParams.set('state', state);
+  return u.toString();
 }
 
 export async function exchangeCode({ clientId, clientSecret, redirectUri, code }) {
@@ -20,26 +19,22 @@ export async function exchangeCode({ clientId, clientSecret, redirectUri, code }
     code,
     redirect_uri: redirectUri
   });
-  const { data } = await axios.post(
-    `${API_BASE}/oauth/token`,
-    body.toString(),
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-  );
+  const { data } = await axios.post(`${API_BASE}/oauth/token`, body.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
   return data;
 }
 
-export async function refreshToken({ clientId, clientSecret, refreshToken }) {
+export async function refreshToken({ clientId, clientSecret, refresh_token }) {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     client_id: clientId,
     client_secret: clientSecret,
-    refresh_token: refreshToken
+    refresh_token
   });
-  const { data } = await axios.post(
-    `${API_BASE}/oauth/token`,
-    body.toString(),
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-  );
+  const { data } = await axios.post(`${API_BASE}/oauth/token`, body.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
   return data;
 }
 
@@ -74,26 +69,11 @@ export async function itemSummary(accessToken, itemId) {
     visits30 = (v?.results?.[itemId]?.total) ?? null;
   } catch {}
 
-  let orders30 = null;
-  try {
-    const dateFrom = new Date(Date.now() - 30 * 864e5).toISOString();
-    const dateTo   = new Date().toISOString();
-    const orders   = await apiGet(`/orders/search`, accessToken, {
-      order_status: 'paid',
-      tags: 'paid',
-      date_created_from: dateFrom,
-      date_created_to: dateTo,
-      item: itemId
-    });
-    orders30 = orders?.paging?.total ?? orders?.results?.length ?? null;
-  } catch {}
-
   let rank = null, total = null;
   try {
     const site = item.site_id || (item.id?.slice(0,3)) || 'MLB';
     const cat  = item.category_id;
     let offset = 0, limit = 50, pos = null, count = null;
-
     while (offset < 1000 && pos === null) {
       const search = await apiGet(`/sites/${site}/search`, accessToken, { category: cat, limit, offset });
       if (count === null) count = search.paging?.total ?? null;
@@ -103,12 +83,8 @@ export async function itemSummary(accessToken, itemId) {
       if ((search.results || []).length < limit) break;
       offset += limit;
     }
-    rank = pos;
-    total = count;
+    rank = pos; total = count;
   } catch {}
-
-  const conversion = (visits30 && orders30) ? (orders30 / visits30) : null;
-  const revenue30  = (orders30 && price)    ? (orders30 * price)    : null;
 
   return {
     id: item.id,
@@ -119,11 +95,12 @@ export async function itemSummary(accessToken, itemId) {
     date_created: item.date_created,
     last_updated: item.last_updated,
     visits_30d: visits30,
-    orders_30d: orders30,
-    conversion_30d: conversion,
-    revenue_30d: revenue30,
+    orders_30d: null,
+    conversion_30d: null,
+    revenue_30d: null,
     seller_permalink,
     seller_nickname,
-    rank_category: (rank && total) ? { position: rank, total } : null
+    rank_category: (rank && total) ? { position: rank, total } : null,
+    permalink: item.permalink
   };
 }
